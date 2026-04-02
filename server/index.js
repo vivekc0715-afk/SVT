@@ -325,13 +325,24 @@ async function connectAndInit() {
 }
 
 app.use('/api', (req, res, next) => {
-  if (!dbReady) {
-    return res.status(500).json({
-      error:
-        'Database unavailable. Please start MongoDB and verify MONGO_URL/MONGO_DB_NAME in server/.env.',
-    });
-  }
-  next();
+  if (dbReady) return next();
+
+  // In serverless (Netlify) environments cold starts are common; try to (re)connect lazily.
+  Promise.resolve()
+    .then(connectAndInit)
+    .then(() => {
+      if (dbReady) return next();
+      return res.status(500).json({
+        error:
+          'Database unavailable. Configure a hosted MongoDB connection and set MONGO_URI in Netlify environment variables (or start MongoDB locally for dev).',
+      });
+    })
+    .catch(() =>
+      res.status(500).json({
+        error:
+          'Database unavailable. Configure a hosted MongoDB connection and set MONGO_URI in Netlify environment variables (or start MongoDB locally for dev).',
+      })
+    );
 });
 
 connectAndInit();
