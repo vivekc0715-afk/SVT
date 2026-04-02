@@ -11,6 +11,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'solvion_secret_key';
 app.use(cors());
 app.use(express.json());
 
+// Prefer a full connection string in hosted/serverless environments (Netlify).
+// Example: mongodb+srv://user:pass@cluster.mongodb.net/solvion_db?retryWrites=true&w=majority
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://127.0.0.1:27017';
 const MONGO_DB_NAME = process.env.MONGO_DB_NAME || process.env.DB_NAME || 'solvion_db';
 
@@ -298,7 +301,19 @@ async function seedIfNeeded() {
 async function connectAndInit() {
   try {
     if (!dbReady) {
-      await mongoose.connect(`${MONGO_URL}/${MONGO_DB_NAME}`);
+      const base = (MONGO_URI || MONGO_URL || '').trim();
+      if (!base) {
+        throw new Error('Missing MongoDB connection string. Set MONGO_URI (recommended) or MONGO_URL.');
+      }
+
+      // If the base already includes a database path, don't append another one.
+      // This supports Atlas-style URIs like: mongodb+srv://.../mydb?...
+      const hasDbPath =
+        /^mongodb(\+srv)?:\/\//.test(base) &&
+        /\/[^/?]+/.test(base.replace(/^mongodb(\+srv)?:\/\/[^/]+/, ''));
+
+      const connectUri = hasDbPath ? base : `${base.replace(/\/+$/, '')}/${MONGO_DB_NAME}`;
+      await mongoose.connect(connectUri);
     }
     await seedIfNeeded();
     dbReady = true;
