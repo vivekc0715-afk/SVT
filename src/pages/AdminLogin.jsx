@@ -33,7 +33,7 @@ const AdminLogin = () => {
       }
     } catch (err) {
       console.error('Login error:', err)
-      setError('Cannot connect to the backend server. Please ensure the server is running on port 5000.')
+      setError('Cannot connect to the backend server. Please check your deployment and API configuration.')
     } finally {
       setLoading(false)
     }
